@@ -11,7 +11,7 @@ channel = connection.channel()
 
 
 
-channel.queue_declare('new_stats')
+channel.queue_declare('new_stats', durable=True)
 
 parser = argparse.ArgumentParser()
 parser.add_argument('-p', '--primary', default=os.environ['PRIMARY'])

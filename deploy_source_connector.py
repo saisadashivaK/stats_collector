@@ -28,8 +28,8 @@ parser.add_argument('streamid', default=os.environ['STREAM_ID'])
 args = parser.parse_args()
 
 # current count of how many analyzes performed - if incremented from current value then we can trigger copy of stats
-curr_ancount = 0
-curr_aucount = 0
+# curr_ancount = 0
+# curr_aucount = 0
 
 primary_host, primary_port = args.primary.split(':')
 # readcopy_host, readcopy_port = args.readcopy.split(':')

@@ -18,7 +18,7 @@ import os
 connection = pika.BlockingConnection(pika.ConnectionParameters('localhost', heartbeat=1000))
 channel = connection.channel()
 
-channel.queue_declare('new_ddls')
+channel.queue_declare('new_ddls', durable=True)
 # channel.queue_declare('new_tables')
 
 
