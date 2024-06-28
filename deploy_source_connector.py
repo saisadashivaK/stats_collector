@@ -23,7 +23,7 @@ parser.add_argument('-u', '--primaryuser', default=os.environ['PRIMARY_USER'])
 
 parser.add_argument('-m', '--masters', default=os.environ['MASTERS'])
 parser.add_argument('-c', '--cdchost', default='localhost')
-parser.add_argument('streamid')
+parser.add_argument('streamid', default=os.environ['STREAM_ID'])
 
 args = parser.parse_args()
 
