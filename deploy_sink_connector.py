@@ -3,14 +3,17 @@ import argparse
 from sqlalchemy import text, create_engine
 import subprocess
 import re
+import os
+
+
 
 parser = argparse.ArgumentParser()
-parser.add_argument('-p', '--primary', default='10.110.11.24:5433')
-parser.add_argument('-d', '--primarydb', default='dryrun1')
-parser.add_argument('-r', '--readcopy', default='10.110.21.59:5434')
-parser.add_argument('-D', '--readdb', default='dryrun1')
-parser.add_argument('-u', '--primaryuser', default='yugabyte')
-parser.add_argument('-U', '--readuser', default='yb-testing-2')
+parser.add_argument('-p', '--primary', default=os.environ['PRIMARY'])
+parser.add_argument('-d', '--primarydb')
+parser.add_argument('-r', '--readcopy', default=os.environ['READCOPY'])
+parser.add_argument('-D', '--readdb')
+parser.add_argument('-u', '--primaryuser', default=os.environ['PRIMARY_USER'])
+parser.add_argument('-U', '--readuser', default=os.environ['READ_USER'])
 
 parser.add_argument('-c', '--cdchost', default='localhost')
 args = parser.parse_args()
@@ -40,24 +43,24 @@ def deploy_sink_connector():
     topiclist = ','.join(tables)
 
     sink_connect = {
+              
               "name": f"sink_common_{args.primarydb}",
               "config": {
-                    "connector.class": "io.confluent.connect.jdbc.JdbcSinkConnector",
+                    "connector.class": "io.debezium.connector.jdbc.JdbcSinkConnector",
                     "transforms": "unwrap",
-                    "tasks.max": "3",
+                    "tasks.max": "1",
                     "topics": topiclist, 
                     "transforms.unwrap.type": "io.debezium.connector.yugabytedb.transforms.YBExtractNewRecordState",
                     "transforms.unwrap.drop.tombstones": "false",
                     "connection.url": f"jdbc:postgresql://{args.readcopy}/{args.readdb}?user={args.readuser}",
-                    "connection.user": args.readuser,
+                    "connection.username": args.readuser,
                     "connection.password": "Sairam@123",
                     "dialect.name": "PostgreSqlDatabaseDialect",
                     "insert.mode": "upsert",
                     "delete.enabled": "true",
                     "table.name.format": "${topic}",
-                    "pk.mode": "record_key",
-                    "auto.create": "false",
-                    "auto.evolve": "true",
+                    "primary.key.mode": "record_key",
+                    "schema.evolution": "basic", 
                     "value.deserializer": "io.confluent.kafka.serializers.KafkaJsonDeserializer"
               }
         }

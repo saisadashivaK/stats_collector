@@ -17,13 +17,11 @@ import os
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument('-p', '--primary', default='10.110.11.24:5433')
+parser.add_argument('-p', '--primary', default=os.environ['PRIMARY'])
 parser.add_argument('-d', '--primarydb', default='tpch_cdc')
-parser.add_argument('-u', '--primaryuser', default='yugabyte')
-# parser.add_argument('-r', '--readcopy', default='10.110.21.59:5434')
-# parser.add_argument('-D', '--readdb', default='postgres')
-# parser.add_argument('-U', '--readuser', default='yb-testing-2')
-parser.add_argument('-m', '--masters', default='10.110.11.23:7100,10.110.11.24:7100,10.110.11.26:7100')
+parser.add_argument('-u', '--primaryuser', default=os.environ['PRIMARY_USER'])
+
+parser.add_argument('-m', '--masters', default=os.environ['MASTERS'])
 parser.add_argument('-c', '--cdchost', default='localhost')
 parser.add_argument('streamid')
 

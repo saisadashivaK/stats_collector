@@ -4,6 +4,7 @@ import json
 import pika
 import argparse
 import time
+import os
 
 connection = pika.BlockingConnection(pika.ConnectionParameters('localhost', heartbeat=1000))
 channel = connection.channel()
@@ -13,12 +14,12 @@ channel = connection.channel()
 channel.queue_declare('new_stats')
 
 parser = argparse.ArgumentParser()
-parser.add_argument('-p', '--primary', default='10.110.21.59:5433')
+parser.add_argument('-p', '--primary', default=os.environ['PRIMARY'])
 parser.add_argument('-d', '--primarydb', default='yugabyte')
-parser.add_argument('-u', '--primaryuser', default='yugabyte')
-parser.add_argument('-r', '--readcopy', default='10.110.21.59:5434')
+parser.add_argument('-u', '--primaryuser', default=os.environ['PRIMARY_USER'])
+parser.add_argument('-r', '--readcopy', default=os.environ['READCOPY'])
 parser.add_argument('-D', '--readdb', default='postgres')
-parser.add_argument('-U', '--readuser', default='yb-testing-2')
+parser.add_argument('-U', '--readuser', default=os.environ['READ_USER'])
 parser.add_argument('-c', '--cdchost', default='localhost')
 
 args = parser.parse_args()
