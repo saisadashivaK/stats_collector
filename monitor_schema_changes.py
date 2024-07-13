@@ -18,7 +18,7 @@ import os
 connection = pika.BlockingConnection(pika.ConnectionParameters('localhost', heartbeat=1000))
 channel = connection.channel()
 
-channel.queue_declare('new_ddls', durable=True)
+channel.queue_declare('new_ddls')
 # channel.queue_declare('new_tables')
 
 
@@ -33,11 +33,12 @@ parser.add_argument('-c', '--cdchost', default='localhost')
 
 args = parser.parse_args()
 
-
+print(args.primary)
+print(args.readcopy)
 primary_host, primary_port = args.primary.split(':')
 readcopy_host, readcopy_port = args.readcopy.split(':')
-engine = create_engine(f'postgresql+psycopg2://{args.primaryuser}@{args.primary}/{args.primarydb}')
-pg_engine = create_engine(f'postgresql+psycopg2://{args.readuser}@{args.readcopy}/{args.readdb}')
+engine = create_engine(f'postgresql+psycopg2://{args.primaryuser}@{args.primary}/{args.primarydb}', connect_args={"connect_timeout": 10})
+pg_engine = create_engine(f'postgresql+psycopg2://{args.readuser}@{args.readcopy}/{args.readdb}', connect_args={"connect_timeout": 10})
 
 def send_create_index(index):
     b = dict(index)
