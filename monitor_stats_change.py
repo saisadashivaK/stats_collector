@@ -112,9 +112,12 @@ def check_for_new_stats():
 def main():
     print("Checking for changes in statistics... ")
     while True:
-        initialize_analyze_counts()
-        check_for_new_stats()
-        time.sleep(5)
+        try:
+            initialize_analyze_counts()
+            check_for_new_stats()
+            time.sleep(5)
+        except Exception as e:
+            print(e)
 
 if __name__ == '__main__':
     main()

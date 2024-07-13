@@ -69,12 +69,24 @@ def deploy_sink_connector():
    
     print("Deploying...")
     resp = requests.post(f"http://{args.cdchost}:8083/connectors", json=sink_connect, headers={"Accept": "application/json"})
+    resp.raise_for_status()
     s = resp.json()
     print("Sairam", s)
 
-def main():
 
-    deploy_sink_connector()
+
+
+def main():
+    while True:
+        try:
+            deploy_sink_connector()
+            print("Deployed sink connector successfully")
+            break
+        except requests.exceptions.HTTPError as httperror:
+            print(httperror)
+            print("HINT: Your CDC service isn't set up properly")
+        except Exception as e:
+            print(e)
 
 if __name__ == '__main__':
     main()

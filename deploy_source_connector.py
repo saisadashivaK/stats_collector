@@ -62,16 +62,22 @@ def deploy_source_connector():
     print("Deploying... ")
     # First check for whether connector exists already and it is running
     resp = requests.get(f"http://{args.cdchost}:8083/connectors?expand=status")
+    resp.raise_for_status()
     stat = resp.json()
     print(stat)
     if stat.get(f'{args.primarydb}_source') is not None:
         if stat[f'{args.primarydb}_source']['status']['connector']['state'] == "RUNNING":
-            print("Connector is already running... ")
+            print("Deleting existing connector... ")
+            r = requests.delete(f"http://{args.cdchost}:8083/connectors/{args.primarydb}_source")
+            r.raise_for_status()
+        
         resp = requests.post(f"http://{args.cdchost}:8083/connectors", json=source_connect, headers={"Accept": "application/json"})
+        resp.raise_for_status()
         s = resp.json()
         print("Sairam", s)
     else:
         resp = requests.post(f"http://{args.cdchost}:8083/connectors", json=source_connect, headers={"Accept": "application/json"})
+        resp.raise_for_status()
         s = resp.json()
         print("Sairam", s)
 
@@ -80,7 +86,16 @@ def deploy_source_connector():
 
 
 def main():
-    deploy_source_connector()
+    while True:
+        print("Attempting to deploy CDC source connector for primary db as {args.primarydb}....")
+        try:
+            deploy_source_connector()
+            print("Deployed connector successfully")
+            break
+        except requests.exceptions.HTTPError as e:
+            print(e)
+
+
 
 
 

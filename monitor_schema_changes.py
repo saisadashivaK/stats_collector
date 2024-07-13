@@ -150,8 +150,11 @@ WHERE pgc.relname in
 def main():
     print("Listening for schema changes in Primary Cluster")
     while True:
-        check_for_new_ddls()
-        sleep(5)
+        try:
+            check_for_new_ddls()
+            sleep(5)
+        except Exception as e:
+            print(e)
 
 if __name__ == '__main__':
     main()

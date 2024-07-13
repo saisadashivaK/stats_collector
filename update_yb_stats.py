@@ -11,7 +11,7 @@ channel = connection.channel()
 
 
 
-channel.queue_declare('new_stats', durable=True)
+channel.queue_declare('new_stats')
 
 parser = argparse.ArgumentParser()
 parser.add_argument('-p', '--primary', default=os.environ['PRIMARY'])
@@ -56,6 +56,7 @@ def update_yb_stat(colstatstmts, tabstats: dict):
 
 
 def on_new_stats_callback(ch, method, properties, body):
+
     ob = json.loads(body)
 
     tablename = ob['tablename']
@@ -92,17 +93,25 @@ def on_new_stats_callback(ch, method, properties, body):
 
 channel.basic_consume(queue='new_stats', on_message_callback=on_new_stats_callback)
 
+def connect_with_dbs():
+    with pg_engine.connect() as conn:
+        with conn.begin() as tn:
+            conn.execute(text("CREATE EXTENSION IF NOT EXISTS dump_stat"))
+            tn.commit()
+
+
+    with engine.connect() as conn:
+        with conn.begin() as tn:
+            conn.execute(text("CREATE EXTENSION IF NOT EXISTS dump_stat"))
+            tn.commit()
+
+while True:
+    try:
+        print('Attempting to connect to database servers... ')
+        connect_with_dbs()
+        break
+    except Exception as e:
+        print(e)
+
 print("Waiting for messages... ")
-
-with pg_engine.connect() as conn:
-    with conn.begin() as tn:
-        conn.execute(text("CREATE EXTENSION IF NOT EXISTS dump_stat"))
-        tn.commit()
-
-
-with engine.connect() as conn:
-    with conn.begin() as tn:
-        conn.execute(text("CREATE EXTENSION IF NOT EXISTS dump_stat"))
-        tn.commit()
-
 channel.start_consuming()
