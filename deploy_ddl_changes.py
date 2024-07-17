@@ -12,14 +12,14 @@ channel = connection.channel()
 
 channel.queue_declare('new_ddls')
 
-
+config = json.load(open('config.json', 'r'))
 
 parser = argparse.ArgumentParser()
 parser.add_argument('-p', '--primary', default=os.environ['PRIMARY'])
-parser.add_argument('-d', '--primarydb', default='latency_testing')
+parser.add_argument('-d', '--primarydb', default=config.get('primarydb'))
 parser.add_argument('-u', '--primaryuser', default=os.environ['PRIMARY_USER'])
-parser.add_argument('-r', '--readcopy', default=os.environ['READCOPY'])
-parser.add_argument('-D', '--readdb', default='postgres')
+parser.add_argument('-r', '--readcopy', default=os.environ['READ_COPY'])
+parser.add_argument('-D', '--readdb', default=config.get('readdb'))
 parser.add_argument('-U', '--readuser', default=os.environ['READ_USER'])
 parser.add_argument('-c', '--cdchost', default='localhost')
 # parser.add_argument('streamid')
@@ -121,9 +121,9 @@ def create_index(req, ch, method):
 
 def tableExists(index):
     with readcopy_engine.connect() as conn:
-        res = conn.execute(f'''
+        res = conn.execute(text(f'''
             SELECT oid from pg_class where relname = '{index['relname']}'
-        ''')
+        '''))
         tbls = res.fetchall()
         print("Table exists", index['relname'], len(tbls))
         return len(tbls) > 0
@@ -131,8 +131,14 @@ def tableExists(index):
 def deploy_sink(req, ch, method):
     # key_list = req['atts'][:req['indnkeyatts']]
     # print("METHOD", method)
+
+    resp = requests.get(f"http://{args.cdchost}:8083/connectors?expand=status")
+    connectors = resp.json()
+    if connectors.get(f'sink_common_{args.primarydb}') is None:
+        return 
     tablename = f'{req["schemaname"]}.{req["relname"]}'
     resp = requests.get(f"http://{args.cdchost}:8083/connectors/sink_common_{args.primarydb}/config")
+     
     config_edited = resp.json()
     topiclist = [topic.strip() for topic in config_edited['topics'].split(',')]
     print(topiclist)

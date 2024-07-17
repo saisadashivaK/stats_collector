@@ -14,16 +14,16 @@ import os
     This code is defined for a particular Yb primary cluster, postgres read copy, CDC connector host.
     
 '''
-
+config = json.load(open('config.json', 'r'))
 
 parser = argparse.ArgumentParser()
 parser.add_argument('-p', '--primary', default=os.environ['PRIMARY'])
-parser.add_argument('-d', '--primarydb', default='tpch_cdc')
+parser.add_argument('-d', '--primarydb', default=config.get('primarydb'))
 parser.add_argument('-u', '--primaryuser', default=os.environ['PRIMARY_USER'])
 
 parser.add_argument('-m', '--masters', default=os.environ['MASTERS'])
 parser.add_argument('-c', '--cdchost', default='localhost')
-parser.add_argument('streamid', default=os.environ['STREAM_ID'])
+parser.add_argument('-s', '--streamid')
 
 args = parser.parse_args()
 
@@ -35,7 +35,7 @@ primary_host, primary_port = args.primary.split(':')
 # readcopy_host, readcopy_port = args.readcopy.split(':')
 
 
-def deploy_source_connector():
+def deploy_source_connector(streamId):
 
     
     print("DEPLOYING SOURCE")
@@ -52,7 +52,7 @@ def deploy_source_connector():
         "database.dbname": args.primarydb,
         "database.master.addresses": args.masters,
         "decimal.handling.mode": "double", 
-        "database.streamid": args.streamid,
+        "database.streamid": streamId,
         "snapshot.mode": "always",
         "table.include.list": f".*",
         "value.serializer": "io.confluent.kafka.serializers.KafkaJsonSerializer"
@@ -88,12 +88,17 @@ def deploy_source_connector():
 def main():
     while True:
         print("Attempting to deploy CDC source connector for primary db as {args.primarydb}....")
+        configLatest = None
+        with open('config.json', 'r') as f:
+            configLatest = json.load(f)
         try:
-            deploy_source_connector()
+            deploy_source_connector(configLatest.get('stream_id'))
             print("Deployed connector successfully")
             break
         except requests.exceptions.HTTPError as e:
             print(e)
+        except Exception as anyotherexception:
+            print(anyotherexception)
 
 
 

@@ -21,13 +21,13 @@ channel = connection.channel()
 channel.queue_declare('new_ddls')
 # channel.queue_declare('new_tables')
 
-
+config = json.load(open('config.json', 'r'))
 parser = argparse.ArgumentParser()
 parser.add_argument('-p', '--primary', default=os.environ['PRIMARY'])
-parser.add_argument('-d', '--primarydb', default='latency_testing')
+parser.add_argument('-d', '--primarydb', default=config.get('primarydb'))
 parser.add_argument('-u', '--primaryuser', default=os.environ['PRIMARY_USER'])
 parser.add_argument('-r', '--readcopy', default=os.environ['READ_COPY'])
-parser.add_argument('-D', '--readdb', default='postgres')
+parser.add_argument('-D', '--readdb', default=config.get('readdb'))
 parser.add_argument('-U', '--readuser', default=os.environ['READ_USER'])
 parser.add_argument('-c', '--cdchost', default='localhost')
 
@@ -61,9 +61,9 @@ def send_deploy_sink(table):
 
 def tableExists(index):
     with pg_engine.connect() as conn:
-        res = conn.execute(f'''
+        res = conn.execute(text(f'''
             SELECT oid from pg_class where relname = '{index['relname']}'
-        ''')
+        '''))
         tbls = res.fetchall()
         print("Table exists", index['relname'], len(tbls))
         return len(tbls) > 0
@@ -72,9 +72,9 @@ def tableExists(index):
 def indexExists(index):
     # pg_engine = create_engine(f'postgresql+psycopg2://{args.readuser}@{args.readcopy}/{args.readdb}')
     with pg_engine.connect() as conn:
-        res = conn.execute(f'''
+        res = conn.execute(text(f'''
             SELECT oid from pg_class where relname = '{index['indexname']}'
-        ''')
+        '''))
         indcs = res.fetchall()
         print("Index exists", index['indexname'], len(indcs))
         return len(indcs) > 0
@@ -133,7 +133,7 @@ WHERE pgc.relname in
             if not doesTableIndexExists:
                 send_deploy_sink(index)
 
-            if index['indexname'] is not None:
+            if index.indexname is not None:
                 if doesTableIndexExists and not indexExists(index):
                     print("Index does not exist")
                     send_create_index(index)

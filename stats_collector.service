@@ -1,0 +1,12 @@
+[Unit]
+Description=A service to manage stats_collector processes
+Wants=multi-user.target
+After=network.target
+
+[Service]
+Type=forking
+ExecStart=/home/ec2-user/stats_collector/script.sh
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

@@ -12,13 +12,13 @@ channel = connection.channel()
 
 
 channel.queue_declare('new_stats')
-
+config = json.load(open('config.json', 'r'))
 parser = argparse.ArgumentParser()
 parser.add_argument('-p', '--primary', default=os.environ['PRIMARY'])
-parser.add_argument('-d', '--primarydb', default='yugabyte')
+parser.add_argument('-d', '--primarydb', default=config.get('primarydb'))
 parser.add_argument('-u', '--primaryuser', default=os.environ['PRIMARY_USER'])
-parser.add_argument('-r', '--readcopy', default=os.environ['READCOPY'])
-parser.add_argument('-D', '--readdb', default='postgres')
+parser.add_argument('-r', '--readcopy', default=os.environ['READ_COPY'])
+parser.add_argument('-D', '--readdb', default=config.get('readdb'))
 parser.add_argument('-U', '--readuser', default=os.environ['READ_USER'])
 parser.add_argument('-c', '--cdchost', default='localhost')
 
@@ -55,7 +55,7 @@ def update_yb_stat(colstatstmts, tabstats: dict):
 
 
 
-def on_new_stats_callback(ch, method, properties, body):
+def on_new_stats(ch, method, properties, body):
 
     ob = json.loads(body)
 
@@ -89,6 +89,11 @@ def on_new_stats_callback(ch, method, properties, body):
     
 
         
+def on_new_stats_callback(ch, method, properties, body):
+    try:
+        on_new_stats(ch, method, properties, body)
+    except Exception as e:
+        print(e)
 
 
 channel.basic_consume(queue='new_stats', on_message_callback=on_new_stats_callback)

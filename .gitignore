@@ -1,2 +1,4 @@
 env_variables
 *.out
+config.json
+
