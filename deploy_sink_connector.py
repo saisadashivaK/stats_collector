@@ -43,7 +43,15 @@ def deploy_sink_connector():
             conn.execute(text(sqlstatements))
             # tn.commit()
 
-    
+     
+    #out = subprocess.run(f'pg_dump -h {primary_host} -p {primary_port} -U {args.primaryuser} -a {args.primarydb} -f  ./dumped_{args.primarydb}.sql'.split(), capture_output=True)
+    #print(out.stdout.decode())
+    os.system(f'pg_dump -h {primary_host} -p {primary_port} -U {args.primaryuser} -a {args.primarydb} -f  ./dumped_{args.primarydb}.sql')
+    #out = subprocess.run(f'psql -h {readcopy_host} -p {readcopy_port} -U {args.readuser} -d {args.readdb} < ./dumped_{args.primarydb}.sql'.split(), capture_output=True)
+    os.system(f'psql -h {readcopy_host} -p {readcopy_port} -U {args.readuser} -d {args.readdb} < ./dumped_{args.primarydb}.sql')
+    #print(out.stdout.decode())
+    print("Dump Complete")
+    #exit(0) 
     topiclist = ','.join(tables)
 
     sink_connect = {
@@ -52,7 +60,7 @@ def deploy_sink_connector():
               "config": {
                     "connector.class": "io.debezium.connector.jdbc.JdbcSinkConnector",
                     "transforms": "unwrap",
-                    "tasks.max": "1",
+                    "tasks.max": "3",
                     "topics": topiclist, 
                     "transforms.unwrap.type": "io.debezium.connector.yugabytedb.transforms.YBExtractNewRecordState",
                     "transforms.unwrap.drop.tombstones": "false",
@@ -85,6 +93,7 @@ def main():
         try:
             deploy_sink_connector()
             print("Deployed sink connector successfully")
+        
             break
         except requests.exceptions.HTTPError as httperror:
             print(httperror)

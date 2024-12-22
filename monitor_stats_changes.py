@@ -82,7 +82,7 @@ def initialize_analyze_counts():
 def check_for_new_stats():
     global current_analyze_count, current_autoanalyze_count
     with pg_engine.connect() as conn:
-        res = conn.pxecute(text(f"SELECT relid, schemaname, relname, analyze_count, autoanalyze_count from pg_stat_user_tables"))
+        res = conn.execute(text(f"SELECT relid, schemaname, relname, analyze_count, autoanalyze_count from pg_stat_user_tables"))
         an_counts = res.fetchall()
 
         changed = False
@@ -121,6 +121,7 @@ def main():
             time.sleep(5)
         except Exception as e:
             print(e)
+            raise e
 
 if __name__ == '__main__':
     main()

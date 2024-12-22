@@ -53,18 +53,19 @@ def deploy_source_connector(streamId):
         "database.master.addresses": args.masters,
         "decimal.handling.mode": "double", 
         "database.streamid": streamId,
-        "snapshot.mode": "always",
+#        "snapshot.mode": "always",
+        "snapshot.mode": "never",
         "table.include.list": f".*",
         "value.serializer": "io.confluent.kafka.serializers.KafkaJsonSerializer"
        }
     }
-    
+    print(source_connect)
     print("Deploying... ")
     # First check for whether connector exists already and it is running
     resp = requests.get(f"http://{args.cdchost}:8083/connectors?expand=status")
     resp.raise_for_status()
     stat = resp.json()
-    print(stat)
+    #print(stat)
     if stat.get(f'{args.primarydb}_source') is not None:
         if stat[f'{args.primarydb}_source']['status']['connector']['state'] == "RUNNING":
             print("Deleting existing connector... ")
@@ -87,7 +88,7 @@ def deploy_source_connector(streamId):
 
 def main():
     while True:
-        print("Attempting to deploy CDC source connector for primary db as {args.primarydb}....")
+        print(f"Attempting to deploy CDC source connector for primary db as {args.primarydb}....")
         configLatest = None
         with open('config.json', 'r') as f:
             configLatest = json.load(f)
