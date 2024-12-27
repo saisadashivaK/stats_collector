@@ -4,6 +4,7 @@ import argparse
 import json
 from time import sleep
 import requests
+import os
 
 '''
 
@@ -20,23 +21,24 @@ channel = connection.channel()
 channel.queue_declare('new_ddls')
 # channel.queue_declare('new_tables')
 
-
+config = json.load(open('config.json', 'r'))
 parser = argparse.ArgumentParser()
-parser.add_argument('-p', '--primary', default='10.110.11.24:5433')
-parser.add_argument('-d', '--primarydb', default='latency_testing')
-parser.add_argument('-u', '--primaryuser', default='yugabyte')
-parser.add_argument('-r', '--readcopy', default='10.110.21.59:5434')
-parser.add_argument('-D', '--readdb', default='postgres')
-parser.add_argument('-U', '--readuser', default='yb-testing-2')
+parser.add_argument('-p', '--primary', default=os.environ['PRIMARY'])
+parser.add_argument('-d', '--primarydb', default=config.get('primarydb'))
+parser.add_argument('-u', '--primaryuser', default=os.environ['PRIMARY_USER'])
+parser.add_argument('-r', '--readcopy', default=os.environ['READ_COPY'])
+parser.add_argument('-D', '--readdb', default=config.get('readdb'))
+parser.add_argument('-U', '--readuser', default=os.environ['READ_USER'])
 parser.add_argument('-c', '--cdchost', default='localhost')
 
 args = parser.parse_args()
 
-
+print(args.primary)
+print(args.readcopy)
 primary_host, primary_port = args.primary.split(':')
 readcopy_host, readcopy_port = args.readcopy.split(':')
-engine = create_engine(f'postgresql+psycopg2://{args.primaryuser}@{args.primary}/{args.primarydb}')
-pg_engine = create_engine(f'postgresql+psycopg2://{args.readuser}@{args.readcopy}/{args.readdb}')
+engine = create_engine(f'postgresql+psycopg2://{args.primaryuser}@{args.primary}/{args.primarydb}', connect_args={"connect_timeout": 10})
+pg_engine = create_engine(f'postgresql+psycopg2://{args.readuser}@{args.readcopy}/{args.readdb}', connect_args={"connect_timeout": 10})
 
 def send_create_index(index):
     b = dict(index)
@@ -59,9 +61,9 @@ def send_deploy_sink(table):
 
 def tableExists(index):
     with pg_engine.connect() as conn:
-        res = conn.execute(f'''
+        res = conn.execute(text(f'''
             SELECT oid from pg_class where relname = '{index['relname']}'
-        ''')
+        '''))
         tbls = res.fetchall()
         print("Table exists", index['relname'], len(tbls))
         return len(tbls) > 0
@@ -70,9 +72,9 @@ def tableExists(index):
 def indexExists(index):
     # pg_engine = create_engine(f'postgresql+psycopg2://{args.readuser}@{args.readcopy}/{args.readdb}')
     with pg_engine.connect() as conn:
-        res = conn.execute(f'''
+        res = conn.execute(text(f'''
             SELECT oid from pg_class where relname = '{index['indexname']}'
-        ''')
+        '''))
         indcs = res.fetchall()
         print("Index exists", index['indexname'], len(indcs))
         return len(indcs) > 0
@@ -131,7 +133,7 @@ WHERE pgc.relname in
             if not doesTableIndexExists:
                 send_deploy_sink(index)
 
-            if index['indexname'] is not None:
+            if index.indexname is not None:
                 if doesTableIndexExists and not indexExists(index):
                     print("Index does not exist")
                     send_create_index(index)
@@ -149,8 +151,11 @@ WHERE pgc.relname in
 def main():
     print("Listening for schema changes in Primary Cluster")
     while True:
-        check_for_new_ddls()
-        sleep(5)
+        try:
+            check_for_new_ddls()
+            sleep(5)
+        except Exception as e:
+            print(e)
 
 if __name__ == '__main__':
     main()

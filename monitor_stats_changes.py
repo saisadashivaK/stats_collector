@@ -13,13 +13,16 @@ channel = connection.channel()
 
 channel.queue_declare('new_stats')
 
+config = json.load(open('config.json', 'r'))
+
+
 parser = argparse.ArgumentParser()
-parser.add_argument('-p', '--primary', default='10.110.11.24:5433')
-parser.add_argument('-d', '--primarydb', default='yugabyte')
-parser.add_argument('-u', '--primaryuser', default='yugabyte')
-parser.add_argument('-r', '--readcopy', default='10.110.21.59:5434')
-parser.add_argument('-D', '--readdb', default='postgres')
-parser.add_argument('-U', '--readuser', default='yb-testing-2')
+parser.add_argument('-p', '--primary', default=os.environ['PRIMARY'])
+parser.add_argument('-d', '--primarydb', default=config.get('primarydb'))
+parser.add_argument('-u', '--primaryuser', default=os.environ['PRIMARY_USER'])
+parser.add_argument('-r', '--readcopy', default=os.environ['READ_COPY'])
+parser.add_argument('-D', '--readdb', default=config.get('readdb'))
+parser.add_argument('-U', '--readuser', default=os.environ['READ_USER'])
 parser.add_argument('-c', '--cdchost', default='localhost')
 
 args = parser.parse_args()
@@ -59,16 +62,16 @@ def initialize_analyze_counts():
         counts = res.fetchall()
         for count in counts:
             # print(count)
-            if analyze_counts.get(count['relname']) is None: # if new relation added and not present in existing one
-                analyze_counts[count['relname']] = {
+            if analyze_counts.get(count.relname) is None: # if new relation added and not present in existing one
+                analyze_counts[count.relname] = {
                     'analyze_count': 0, 
                     'autoanalyze_count': 0
                 }
             else:
-                if count['last_analyze'] is None:
-                    analyze_counts[count['relname']]['analyze_count'] = count['analyze_count']
-                if count['last_autoanalyze'] is None:
-                    analyze_counts[count['relname']]['autoanalyze_count'] = count['autoanalyze_count']
+                if count.last_analyze is None:
+                    analyze_counts[count['relname']]['analyze_count'] = count.analyze_count
+                if count.last_autoanalyze is None:
+                    analyze_counts[count.relname]['autoanalyze_count'] = count.autoanalyze_count
                 
         save_analyze_counts()
 
@@ -85,22 +88,22 @@ def check_for_new_stats():
         changed = False
 
         for an_count in an_counts:
-            if analyze_counts.get(an_count['relname']) is None:
-                analyze_counts[an_count['relname']] = {
+            if analyze_counts.get(an_count.relname) is None:
+                analyze_counts[an_count.relname] = {
                     'analyze_count': 0, 
                     'autoanalyze_count': 0
                 }
 
-            if an_count['analyze_count'] > analyze_counts[an_count['relname']]['analyze_count'] or an_count['autoanalyze_count'] > analyze_counts[an_count['relname']]['autoanalyze_count']:
+            if an_count.analyze_count > analyze_counts[an_count.relname]['analyze_count'] or an_count.autoanalyze_count > analyze_counts[an_count.relname]['autoanalyze_count']:
                 content = {
-                    'tablename': an_count['relname'], 
-                    'schemaname': an_count['schemaname'], 
-                    'relid': an_count['relid']
+                    'tablename': an_count.relname, 
+                    'schemaname': an_count.schemaname, 
+                    'relid': an_count.relid
                 }
                 changed = True
-                analyze_counts[an_count['relname']] = {
-                    'analyze_count': an_count['analyze_count'], 
-                    'autoanalyze_count': an_count['autoanalyze_count']
+                analyze_counts[an_count.relname] = {
+                    'analyze_count': an_count.analyze_count, 
+                    'autoanalyze_count': an_count.autoanalyze_count
                 }
                 channel.basic_publish(exchange='', routing_key='new_stats', body=json.dumps(content))
 
@@ -112,9 +115,13 @@ def check_for_new_stats():
 def main():
     print("Checking for changes in statistics... ")
     while True:
-        initialize_analyze_counts()
-        check_for_new_stats()
-        time.sleep(5)
+        try:
+            initialize_analyze_counts()
+            check_for_new_stats()
+            time.sleep(5)
+        except Exception as e:
+            print(e)
+            raise e
 
 if __name__ == '__main__':
     main()

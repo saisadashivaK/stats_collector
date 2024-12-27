@@ -4,6 +4,7 @@ import json
 import pika
 import argparse
 import time
+import os
 
 connection = pika.BlockingConnection(pika.ConnectionParameters('localhost', heartbeat=1000))
 channel = connection.channel()
@@ -11,23 +12,27 @@ channel = connection.channel()
 
 
 channel.queue_declare('new_stats')
-
+config = json.load(open('config.json', 'r'))
 parser = argparse.ArgumentParser()
-parser.add_argument('-p', '--primary', default='10.110.21.59:5433')
-parser.add_argument('-d', '--primarydb', default='yugabyte')
-parser.add_argument('-u', '--primaryuser', default='yugabyte')
-parser.add_argument('-r', '--readcopy', default='10.110.21.59:5434')
-parser.add_argument('-D', '--readdb', default='postgres')
-parser.add_argument('-U', '--readuser', default='yb-testing-2')
+parser.add_argument('-p', '--primary', default=os.environ['PRIMARY'])
+parser.add_argument('-d', '--primarydb', default=config.get('primarydb'))
+parser.add_argument('-u', '--primaryuser', default=os.environ['PRIMARY_USER'])
+parser.add_argument('-r', '--readcopy', default=os.environ['READ_COPY'])
+parser.add_argument('-D', '--readdb', default=config.get('readdb'))
+parser.add_argument('-U', '--readuser', default=os.environ['READ_USER'])
 parser.add_argument('-c', '--cdchost', default='localhost')
 
 args = parser.parse_args()
 
+primary1 = os.environ['PRIMARY']
+#primary2, primary3 = os.environ['PRIMARY2'],os.environ['PRIMARY3']
+ybengine1 = create_engine(f'postgresql+psycopg2://{args.primaryuser}@{primary1}/{args.primarydb}', echo=True)
+#ybengine2 = create_engine(f'postgresql+psycopg2://{args.primaryuser}@{primary2}/{args.primarydb}', echo=True)
+#ybengine3 = create_engine(f'postgresql+psycopg2://{args.primaryuser}@{primary3}/{args.primarydb}', echo=True)
 
-engine = create_engine(f'postgresql+psycopg2://{args.primaryuser}@{args.primary}/{args.primarydb}', echo=True)
 pg_engine = create_engine(f'postgresql+psycopg2://{args.readuser}@{args.readcopy}/{args.readdb}')
 
-def update_yb_stat(colstatstmts, tabstats: dict):
+def update_yb_stat(colstatstmts, tabstats: dict, engine):
     with engine.connect() as conn:
         with conn.begin() as tn:
             conn.execute(text('SET yb_non_ddl_txn_for_sys_tables_allowed = ON'))
@@ -39,12 +44,15 @@ def update_yb_stat(colstatstmts, tabstats: dict):
                 WHERE relname = '{tabstats[0]['relname']}'
             '''))
 
+            conn.execute(text(f"DELETE FROM pg_statistic WHERE starelid = '{tabstats[0]['relid']}'"))
+
             # update indexrowstats  for the indexes of the relation
             for indexrow in tabstats:
                 conn.execute(text(f'''
                 UPDATE pg_class SET reltuples = {indexrow['ireltuples']}, relpages = {indexrow['irelpages']}, relallvisible = {indexrow['irelallvisible']} 
                 WHERE relname = '{indexrow['irelname']}'
                 '''))
+                conn.execute(text(f"DELETE FROM pg_statistic WHERE starelid = '{indexrow['irelid']}'"))
 
             # update column stats of indexes and relations
             for colstatstmt in colstatstmts:
@@ -54,7 +62,8 @@ def update_yb_stat(colstatstmts, tabstats: dict):
 
 
 
-def on_new_stats_callback(ch, method, properties, body):
+def on_new_stats(ch, method, properties, body):
+
     ob = json.loads(body)
 
     tablename = ob['tablename']
@@ -81,27 +90,42 @@ def on_new_stats_callback(ch, method, properties, body):
         
             
         
-        update_yb_stat(colstats, tabstats)
+        update_yb_stat(colstats, tabstats, ybengine1)
+#        update_yb_stat(colstats, tabstats, ybengine2)
+#       update_yb_stat(colstats, tabstats, ybengine3)
         ch.basic_ack(delivery_tag=method.delivery_tag)
         # print(tabstats)
     
 
         
+def on_new_stats_callback(ch, method, properties, body):
+    try:
+        on_new_stats(ch, method, properties, body)
+    except Exception as e:
+        print(e)
 
 
 channel.basic_consume(queue='new_stats', on_message_callback=on_new_stats_callback)
 
+def connect_with_dbs():
+    with pg_engine.connect() as conn:
+        with conn.begin() as tn:
+            conn.execute(text("CREATE EXTENSION IF NOT EXISTS dump_stat"))
+            tn.commit()
+
+
+    with ybengine1.connect() as conn:
+        with conn.begin() as tn:
+            conn.execute(text("CREATE EXTENSION IF NOT EXISTS dump_stat"))
+            tn.commit()
+
+while True:
+    try:
+        print('Attempting to connect to database servers... ')
+        connect_with_dbs()
+        break
+    except Exception as e:
+        print(e)
+
 print("Waiting for messages... ")
-
-with pg_engine.connect() as conn:
-    with conn.begin() as tn:
-        conn.execute(text("CREATE EXTENSION IF NOT EXISTS dump_stat"))
-        tn.commit()
-
-
-with engine.connect() as conn:
-    with conn.begin() as tn:
-        conn.execute(text("CREATE EXTENSION IF NOT EXISTS dump_stat"))
-        tn.commit()
-
 channel.start_consuming()
